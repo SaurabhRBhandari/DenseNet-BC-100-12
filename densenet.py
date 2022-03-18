@@ -1,102 +1,172 @@
+# importing necesarry modules
 import torch
 import torch.nn as nn
-import torch.nn.functional as fn
 
 
-class BasicConvBlock(nn.Module):
-    def __init__(self, in_features, out_features):
-        super(BasicConvBlock, self).__init__()
+class DenseLayer(nn.Module):
+
+    '''
+       Dense Layer is the most fundamental layer of Dense Layer,
+       produces 12 feature maps and adds them to the existing global 
+       feature maps
+    '''
+
+    def __init__(self, in_channels):
+
+        # Call nn.module.__init__()
+        super(DenseLayer, self).__init__()
+
         self.stack = nn.Sequential(
-            nn.BatchNorm2d(in_features),
+
+            # Batch normalization layer
+            nn.BatchNorm2d(in_channels),
+
+            # ReLU activation function
             nn.ReLU(),
-            nn.Conv2d(in_features, out_features,
-                               kernel_size=3, stride=1, padding=1)
+
+            # First Conv layer in the Dense Layer
+            nn.Conv2d(in_channels, 48, kernel_size=1,
+                      stride=1, padding=0),
+
+            # Batch normalization layer
+            nn.BatchNorm2d(48),
+
+            # ReLU activation function
+            nn.ReLU(),
+
+            # Final Convolution layer in the Dense layer
+            nn.Conv2d(48, 12, kernel_size=3, stride=1, padding=1)
         )
 
     def forward(self, x):
-        return torch.cat([x, self.stack(x)], 1)
+        '''Makes forward pass through the Dense Layer'''
 
+        out = self.stack(x)
 
-class BottleNeckBlock(nn.Module):
-    def __init__(self, in_features, out_features):
-        super(BottleNeckBlock, self).__init__()
-        inter_planes = out_features * 4
-        self.bn1 = nn.BatchNorm2d(in_features)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv1 = nn.Conv2d(in_features, inter_planes, kernel_size=1, stride=1,
-                               padding=0, bias=False)
-        self.bn2 = nn.BatchNorm2d(inter_planes)
-        self.conv2 = nn.Conv2d(inter_planes, out_features, kernel_size=3, stride=1,
-                               padding=1, bias=False)
-        self.stack = nn.Sequential(
-            self.bn1,
-            nn.ReLU(),
-            self.conv1,
-            self.bn2,
-            nn.ReLU(),
-            self.conv2
-        )
-
-    def forward(self, x):
-        return torch.cat([x, self.stack(x)], 1)
+        return torch.cat([x, out], 1)
 
 
 class TransitionBlock(nn.Module):
-    def __init__(self, in_features, out_features):
+
+    '''
+       Transition Block changes the volume of feature
+       maps between two dense blocks
+    '''
+
+    def __init__(self, in_channels, out_channels):
+
+        # Call nn.module.__init__()
         super(TransitionBlock, self).__init__()
-        self.bn1 = nn.BatchNorm2d(in_features)
-        self.relu = nn.ReLU()
-        self.conv1 = nn.Conv2d(in_features, out_features,
-                               kernel_size=1, stride=1, padding=0)
+
         self.stack = nn.Sequential(
-            self.bn1,
-            self.relu,
-            self.conv1,
+
+            # Batch normalization Layer
+            nn.BatchNorm2d(in_channels),
+
+            # ReLU activation function
+            nn.ReLU(),
+
+            # 1x1 convolution to reduce the feature map volume
+            nn.Conv2d(in_channels, out_channels,
+                      kernel_size=1, stride=1),
+
+
+            # pooling layer to reduce feature map size
+            nn.AvgPool2d(kernel_size=2)
         )
 
     def forward(self, x):
-        return fn.avg_pool2d(self.stack(x), 2)
+        '''Make a forward pass through the Transition Block'''
+
+        out = self.stack(x)
+
+        return out
 
 
 class DenseBlock(nn.Module):
-    def __init__(self, nb_layers, in_features, growth_rate):
-        super(DenseBlock, self).__init__()
-        self.layers = self._make_layer(
-            in_features, growth_rate, nb_layers)
 
-    def _make_layer(self,in_features, growth_rate, nb_layers):
+    '''
+       Dense block is a collection of 16 Dense layers where 
+       each layer is connected to each other
+    '''
+
+    def __init__(self, in_channels):
+
+        # Call nn.module.__init__()
+        super(DenseBlock, self).__init__()
+
+        self.stack = self._make_layer(in_channels)
+
+    def _make_layer(self, in_channels):
+        '''Makes and stacks the 16 dense layers'''
+
         layers = []
-        for i in range(nb_layers):
-            layers.append(BottleNeckBlock(in_features+i*growth_rate,growth_rate))
+
+        for i in range(16):
+
+            # Make the ith dense-layer and add it to the list of dense layer
+            layers.append(DenseLayer(in_channels+i*12))
+
+        # return the stack of 16 layers
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        return self.layers(x)
+        '''Makes a forward pass through the Dense block'''
+
+        return self.stack(x)
+
 
 class DenseNet_BC_100_12(nn.Module):
+
+    '''
+       Stacks all the layer of DenseNet-BC-100-12 network 
+       making the complete architecture.
+    '''
+
     def __init__(self):
-        super(DenseNet_BC_100_12,self).__init__()
-        self.c1=nn.Conv2d(3,24,kernel_size=3,stride=1,padding=1)
-        self.db1=DenseBlock(16,24,12)
-        self.t1=TransitionBlock(216,108)
-        self.db2=DenseBlock(16,108,12)
-        self.t2=TransitionBlock(300,150)
-        self.db3=DenseBlock(16,150,12)
-        self.bn1=nn.BatchNorm2d(342)
-        self.relu=nn.ReLU()
-        self.fc=nn.Linear(342,10)
-        self.stack=nn.Sequential(self.c1,
-                                 self.db1,
-                                 self.t1,
-                                 self.db2,
-                                 self.t2,
-                                 self.db3,
-                                 self.bn1,
-                                 self.relu,
-                                 nn.AvgPool2d(8),
-                                 nn.Flatten(),
-                                 self.fc
-                                 )
-        
-    def forward(self,x):
+
+        # Call nn.module.__init__()
+        super(DenseNet_BC_100_12, self).__init__()
+
+        self.stack = nn.Sequential(
+
+            # C1
+            nn.Conv2d(in_channels=3, out_channels=24,
+                      kernel_size=3, stride=1, padding=1),
+
+            # DB1
+            DenseBlock(in_channels=24),
+
+            # T1
+            TransitionBlock(in_channels=216, out_channels=108),
+
+            # DB2
+            DenseBlock(in_channels=108),
+
+            # T2
+            TransitionBlock(in_channels=300, out_channels=150),
+
+            # DB3
+            DenseBlock(in_channels=150),
+
+            # Batch Normalization Layer
+            nn.BatchNorm2d(num_features=342),
+
+            # ReLU activation function
+            nn.ReLU(),
+
+            # Average Pooling Layer
+            nn.AvgPool2d(kernel_size=8),
+
+            # Flatten the output  of DenseNet Convolutions
+            nn.Flatten(),
+
+            # Pass the features to a fully-connected layer
+            nn.Linear(in_features=342, out_features=10)
+
+        )
+
+    def forward(self, x):
+        '''Makes a forward pass to the network'''
+
         return self.stack(x)
