@@ -166,7 +166,7 @@ class DenseNet_BC_100_12(nn.Module):
             nn.Linear(in_features=342, out_features=10),
             
             # Softmax Classifier
-            nn.Softmax()
+            nn.Softmax(dim=1)
 
         )
 
@@ -174,3 +174,4 @@ class DenseNet_BC_100_12(nn.Module):
         '''Makes a forward pass to the network'''
 
         return self.stack(x)
+    
