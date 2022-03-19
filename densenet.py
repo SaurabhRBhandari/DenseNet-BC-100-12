@@ -1,4 +1,5 @@
 # importing necesarry modules
+
 import torch
 import torch.nn as nn
 
@@ -24,7 +25,7 @@ class DenseLayer(nn.Module):
             # ReLU activation function
             nn.ReLU(),
 
-            # First Conv layer in the Dense Layer
+            # First Conv layer in the Dense Layer produces 4*growth rate feature maps
             nn.Conv2d(in_channels, 48, kernel_size=1,
                       stride=1, padding=0),
 
@@ -34,7 +35,7 @@ class DenseLayer(nn.Module):
             # ReLU activation function
             nn.ReLU(),
 
-            # Final Convolution layer in the Dense layer
+            # Final Convolution layer in the Dense layer produces 'growth rate' parameters
             nn.Conv2d(48, 12, kernel_size=3, stride=1, padding=1)
         )
 
@@ -66,7 +67,7 @@ class TransitionBlock(nn.Module):
             # ReLU activation function
             nn.ReLU(),
 
-            # 1x1 convolution to reduce the feature map volume
+            # 1x1 convolution to reduce the number of feature maps
             nn.Conv2d(in_channels, out_channels,
                       kernel_size=1, stride=1),
 
@@ -124,7 +125,7 @@ class DenseNet_BC_100_12(nn.Module):
     '''
 
     def __init__(self):
-
+    
         # Call nn.module.__init__()
         super(DenseNet_BC_100_12, self).__init__()
 
@@ -162,7 +163,10 @@ class DenseNet_BC_100_12(nn.Module):
             nn.Flatten(),
 
             # Pass the features to a fully-connected layer
-            nn.Linear(in_features=342, out_features=10)
+            nn.Linear(in_features=342, out_features=10),
+            
+            # Softmax Classifier
+            nn.Softmax()
 
         )
 
